@@ -23,151 +23,161 @@
 -- | Orphan instances for the 'Prim' typeclass.
 module Data.Primitive.Instances () where
 
-import Control.Monad.Primitive
-import Control.Monad.ST
-import Data.Complex
-import Data.Functor.Const
+import Data.Complex (Complex(..))
+import Data.Functor.Const (Const(..))
 #if MIN_VERSION_base(4,8,0)
-import Data.Functor.Identity
+import Data.Functor.Identity (Identity(..))
 #endif
 import qualified Data.Monoid as Monoid
 import qualified Data.Semigroup as Semigroup
-import Data.Ord
-import Data.Primitive.Addr
-import Data.Primitive.ByteArray
-import Data.Primitive.Types
-import GHC.Real
-import Data.Word
-import GHC.Fingerprint
-import GHC.Prim
-import GHC.Types
+import Data.Ord (Down(..))
+--import Data.Primitive.ByteArray
+import Data.Primitive.Types (Prim(..), defaultSetOffAddr#, defaultSetByteArray#)
+import GHC.Real (Ratio(..))
+import Data.Word (Word64)
+import GHC.Fingerprint (Fingerprint(..))
+import GHC.Exts (State#, Int#, Addr#, MutableByteArray#, (+#), (*#))
 
 instance Prim a => Prim (Complex a) where
   sizeOf# _ = 2# *# sizeOf# (undefined :: a)
   alignment# _ = alignment# (undefined :: a)
   indexByteArray# arr# i# =
-    let i = I# i#
-        arr = ByteArray arr#
-    in
-         (indexByteArray arr (2 * i + 0))
-      :+ (indexByteArray arr (2 * i + 1))
+    let x,y :: a
+        x = indexByteArray# arr# (2# *# i#)
+        y = indexByteArray# arr# (2# *# i# +# 1#) 
+    in x :+ y
   readByteArray# :: forall s a. (Prim a) => MutableByteArray# s -> Int# -> State# s -> (# State# s, Complex a #)
-  readByteArray# arr# i# = internal $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    a <- readByteArray arr (2 * i + 0) :: ST s a
-    b <- readByteArray arr (2 * i + 1)
-    return (a :+ b)
+  readByteArray# arr# i# =
+    \s0 -> case readByteArray# arr# (2# *# i#) s0 of
+      (# s1#, x #) -> case readByteArray# arr# (2# *# i# +# 1#) s1# of
+        (# s2#, y #) -> (# s2#, x :+ y #)
   writeByteArray# :: forall s a. (Prim a) => MutableByteArray# s -> Int# -> Complex a -> State# s -> State# s
-  writeByteArray# arr# i# (a :+ b) = internal_ $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    writeByteArray arr (2 * i + 0) a
-    writeByteArray arr (2 * i + 1) b :: ST s ()
+  writeByteArray# arr# i# (a :+ b) =
+    \s0 -> case writeByteArray# arr# (2# *# i#) a s0 of
+      s1 -> case writeByteArray# arr# (2# *# i# +# 1#) b s1 of
+        s2 -> s2
   setByteArray# = defaultSetByteArray#
   indexOffAddr# :: Addr# -> Int# -> Complex a
   indexOffAddr# addr# i# =
-    let i = I# i#
-        addr = Addr addr#
-    in (indexOffAddr addr (2 * i + 0)) :+ (indexOffAddr addr (2 * i + 1))
+    let x,y :: a
+        x = indexOffAddr# addr# (2# *# i#)
+        y = indexOffAddr# addr# (2# *# i# +# 1#)
+    in x :+ y
   readOffAddr# :: forall s a. (Prim a) => Addr# -> Int# -> State# s -> (# State# s, Complex a #)
-  readOffAddr# addr# i# = internal $ do
-    let i = I# i#
-        addr = Addr addr#
-    a <- readOffAddr addr (2 * i + 0) :: ST s a
-    b <- readOffAddr addr (2 * i + 1)
-    return (a :+ b)
+  readOffAddr# addr# i# =
+    \s0 -> case readOffAddr# addr# (2# *# i#) s0 of
+      (# s1, x #) -> case readOffAddr# addr# (2# *# i# +# 1#) s1 of
+        (# s2, y #) -> (# s2, x :+ y #)
   writeOffAddr# :: forall s a. (Prim a) => Addr# -> Int# -> Complex a -> State# s -> State# s
-  writeOffAddr# addr# i# (a :+ b) = internal_ $ do
-    let i = I# i#
-        addr = Addr addr#
-    writeOffAddr addr (2 * i + 0) a
-    writeOffAddr addr (2 * i + 1) b :: ST s ()
+  writeOffAddr# addr# i# (a :+ b) =
+    \s0 -> case writeOffAddr# addr# (2# *# i#) a s0 of
+      s1 -> case writeOffAddr# addr# (2# *# i# +# 1#) b s1 of
+        s2 -> s2
   setOffAddr# = defaultSetOffAddr#
+  {-# INLINE sizeOf# #-}
+  {-# INLINE alignment# #-}
+  {-# INLINE indexByteArray# #-}
+  {-# INLINE readByteArray# #-}
+  {-# INLINE writeByteArray# #-}
+  {-# INLINE setByteArray# #-}
+  {-# INLINE indexOffAddr# #-}
+  {-# INLINE readOffAddr# #-}
+  {-# INLINE writeOffAddr# #-}
+  {-# INLINE setOffAddr# #-}
 
 instance (Integral a, Prim a) => Prim (Ratio a) where
-  sizeOf# _ = 2# *# sizeOf# (undefined :: a)
-  alignment# _ = alignment# (undefined :: a)
+  sizeOf# _ = 2# *# sizeOf# (undefined :: a) 
+  alignment# _ = alignment# (undefined :: a) 
   indexByteArray# arr# i# =
-    let i = I# i#
-        arr = ByteArray arr#
-    in
-         (indexByteArray arr (2 * i + 0))
-      % (indexByteArray arr (2 * i + 1))
-  readByteArray# :: forall s a. (Integral a, Prim a) => MutableByteArray# s -> Int# -> State# s -> (# State# s, Ratio a #)
-  readByteArray# arr# i# = internal $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    a <- readByteArray arr (2 * i + 0) :: ST s a
-    b <- readByteArray arr (2 * i + 1)
-    return (a % b)
+    let x,y :: a
+        x = indexByteArray# arr# (2# *# i#)
+        y = indexByteArray# arr# (2# *# i# +# 1#) 
+    in x :% y
+  readByteArray# :: forall s a. (Prim a) => MutableByteArray# s -> Int# -> State# s -> (# State# s, Ratio a #)
+  readByteArray# arr# i# =
+    \s0 -> case readByteArray# arr# (2# *# i#) s0 of
+      (# s1#, x #) -> case readByteArray# arr# (2# *# i# +# 1#) s1# of
+        (# s2#, y #) -> (# s2#, x :% y #)
   writeByteArray# :: forall s a. (Prim a) => MutableByteArray# s -> Int# -> Ratio a -> State# s -> State# s
-  writeByteArray# arr# i# (a :% b) = internal_ $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    writeByteArray arr (2 * i + 0) a
-    writeByteArray arr (2 * i + 1) b :: ST s ()
+  writeByteArray# arr# i# (a :% b) =
+    \s0 -> case writeByteArray# arr# (2# *# i#) a s0 of
+      s1 -> case writeByteArray# arr# (2# *# i# +# 1#) b s1 of
+        s2 -> s2
   setByteArray# = defaultSetByteArray#
   indexOffAddr# :: Addr# -> Int# -> Ratio a
   indexOffAddr# addr# i# =
-    let i = I# i#
-        addr = Addr addr#
-    in (indexOffAddr addr (2 * i + 0)) :% (indexOffAddr addr (2 * i + 1))
+    let x,y :: a
+        x = indexOffAddr# addr# (2# *# i#)
+        y = indexOffAddr# addr# (2# *# i# +# 1#)
+    in x :% y
   readOffAddr# :: forall s a. (Prim a) => Addr# -> Int# -> State# s -> (# State# s, Ratio a #)
-  readOffAddr# addr# i# = internal $ do
-    let i = I# i#
-        addr = Addr addr#
-    a <- readOffAddr addr (2 * i + 0) :: ST s a
-    b <- readOffAddr addr (2 * i + 1)
-    return (a :% b)
+  readOffAddr# addr# i# =
+    \s0 -> case readOffAddr# addr# (2# *# i#) s0 of
+      (# s1, x #) -> case readOffAddr# addr# (2# *# i# +# 1#) s1 of
+        (# s2, y #) -> (# s2, x :% y #)
   writeOffAddr# :: forall s a. (Prim a) => Addr# -> Int# -> Ratio a -> State# s -> State# s
-  writeOffAddr# addr# i# (a :% b) = internal_ $ do
-    let i = I# i#
-        addr = Addr addr#
-    writeOffAddr addr (2 * i + 0) a
-    writeOffAddr addr (2 * i + 1) b :: ST s ()
+  writeOffAddr# addr# i# (a :% b) =
+    \s0 -> case writeOffAddr# addr# (2# *# i#) a s0 of
+      s1 -> case writeOffAddr# addr# (2# *# i# +# 1#) b s1 of
+        s2 -> s2
   setOffAddr# = defaultSetOffAddr#
+  {-# INLINE sizeOf# #-}
+  {-# INLINE alignment# #-}
+  {-# INLINE indexByteArray# #-}
+  {-# INLINE readByteArray# #-}
+  {-# INLINE writeByteArray# #-}
+  {-# INLINE setByteArray# #-}
+  {-# INLINE indexOffAddr# #-}
+  {-# INLINE readOffAddr# #-}
+  {-# INLINE writeOffAddr# #-}
+  {-# INLINE setOffAddr# #-}
 
 instance Prim Fingerprint where 
   sizeOf# _ = 2# *# sizeOf# (undefined :: Word64)
   alignment# _ = alignment# (undefined :: Word64)
   indexByteArray# arr# i# =
-    let i = I# i#
-        arr = ByteArray arr#
-    in Fingerprint (indexByteArray arr (2 * i + 0)) (indexByteArray arr (2 * i + 1))
+    let x,y :: Word64
+        x = indexByteArray# arr# (2# *# i#)
+        y = indexByteArray# arr# (2# *# i# +# 1#) 
+    in Fingerprint x y
   readByteArray# :: forall s. MutableByteArray# s -> Int# -> State# s -> (# State# s, Fingerprint #)
-  readByteArray# arr# i# = internal $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    a <- readByteArray arr (2 * i + 0) :: ST s Word64
-    b <- readByteArray arr (2 * i + 1)
-    return (Fingerprint a b)
+  readByteArray# arr# i# =
+    \s0 -> case readByteArray# arr# (2# *# i#) s0 of
+      (# s1#, x #) -> case readByteArray# arr# (2# *# i# +# 1#) s1# of
+        (# s2#, y #) -> (# s2#, Fingerprint x y #)
   writeByteArray# :: forall s. MutableByteArray# s -> Int# -> Fingerprint -> State# s -> State# s
-  writeByteArray# arr# i# (Fingerprint a b) = internal_ $ do
-    let i = I# i#
-        arr = MutableByteArray arr#
-    writeByteArray arr (2 * i + 0) a
-    writeByteArray arr (2 * i + 1) b :: ST s ()
+  writeByteArray# arr# i# (Fingerprint a b) =
+    \s0 -> case writeByteArray# arr# (2# *# i#) a s0 of
+      s1 -> case writeByteArray# arr# (2# *# i# +# 1#) b s1 of
+        s2 -> s2
   setByteArray# = defaultSetByteArray#
   indexOffAddr# :: Addr# -> Int# -> Fingerprint
   indexOffAddr# addr# i# =
-    let i = I# i#
-        addr = Addr addr#
-    in Fingerprint (indexOffAddr addr (2 * i + 0)) (indexOffAddr addr (2 * i + 1))
+    let x,y :: Word64
+        x = indexOffAddr# addr# (2# *# i#)
+        y = indexOffAddr# addr# (2# *# i# +# 1#)
+    in Fingerprint x y
   readOffAddr# :: forall s. Addr# -> Int# -> State# s -> (# State# s, Fingerprint #)
-  readOffAddr# addr# i# = internal $ do
-    let i = I# i#
-        addr = Addr addr#
-    a <- readOffAddr addr (2 * i + 0) :: ST s Word64
-    b <- readOffAddr addr (2 * i + 1)
-    return (Fingerprint a b)
+  readOffAddr# addr# i# =
+    \s0 -> case readOffAddr# addr# (2# *# i#) s0 of
+      (# s1, x #) -> case readOffAddr# addr# (2# *# i# +# 1#) s1 of
+        (# s2, y #) -> (# s2, Fingerprint x y #)
   writeOffAddr# :: forall s. Addr# -> Int# -> Fingerprint -> State# s -> State# s
-  writeOffAddr# addr# i# (Fingerprint a b) = internal_ $ do
-    let i = I# i#
-        addr = Addr addr#
-    writeOffAddr addr (2 * i + 0) a
-    writeOffAddr addr (2 * i + 1) b :: ST s ()
+  writeOffAddr# addr# i# (Fingerprint a b) =
+    \s0 -> case writeOffAddr# addr# (2# *# i#) a s0 of
+      s1 -> case writeOffAddr# addr# (2# *# i# +# 1#) b s1 of
+        s2 -> s2
   setOffAddr# = defaultSetOffAddr#
+  {-# INLINE sizeOf# #-}
+  {-# INLINE alignment# #-}
+  {-# INLINE indexByteArray# #-}
+  {-# INLINE readByteArray# #-}
+  {-# INLINE writeByteArray# #-}
+  {-# INLINE setByteArray# #-}
+  {-# INLINE indexOffAddr# #-}
+  {-# INLINE readOffAddr# #-}
+  {-# INLINE writeOffAddr# #-}
+  {-# INLINE setOffAddr# #-}
 
 deriving instance Prim a => Prim (Down a)
 #if MIN_VERSION_base(4,8,0)
@@ -183,7 +193,3 @@ deriving instance Prim a => Prim (Semigroup.Min a)
 deriving instance Prim a => Prim (Semigroup.Max a)
 #endif
 deriving instance Prim a => Prim (Const a b)
-
-internal_ :: PrimBase m => m () -> State# (PrimState m) -> State# (PrimState m)
-internal_ m s = case internal m s of
-  (# s', () #) -> s'
