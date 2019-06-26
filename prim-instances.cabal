@@ -11,7 +11,7 @@ description:
   (i.e. are well-aligned) have trivially lawful and
   sometimes useful instances.
 homepage:
-  https://github.com/chessai/prim-instances.git
+  https://github.com/haskell-primitive/prim-instances.git
 license:
   BSD-3-Clause
 license-file:
@@ -50,3 +50,8 @@ test-suite test
      , base
      , prim-instances
      , quickcheck-classes
+
+source-repository head
+  type: git
+  location: https://github.com/haskell-primitive/prim-instances.git
+
