@@ -1,14 +1,17 @@
-{-# LANGUAGE BangPatterns               #-}
-{-# LANGUAGE CPP                        #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE InstanceSigs               #-}
-{-# LANGUAGE MagicHash                  #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE StandaloneDeriving         #-}
+{-# language
+        BangPatterns
+      , CPP
+      , GeneralizedNewtypeDeriving
+      , InstanceSigs
+      , MagicHash
+      , ScopedTypeVariables
+      , StandaloneDeriving
+      , UnboxedTuples
+  #-}
+
 #if __GLASGOW_HASKELL__ >= 800
-{-# LANGUAGE TypeInType                 #-}
+{-# language TypeInType #-}
 #endif
-{-# LANGUAGE UnboxedTuples              #-}
 
 {-# OPTIONS_GHC
       -Weverything
@@ -24,6 +27,7 @@
 module Data.Primitive.Instances () where
 
 import Data.Complex (Complex(..))
+#if !MIN_VERSION_primitive(0,7,0)
 import Data.Functor.Const (Const(..))
 #if MIN_VERSION_base(4,8,0)
 import Data.Functor.Identity (Identity(..))
@@ -31,7 +35,7 @@ import Data.Functor.Identity (Identity(..))
 import qualified Data.Monoid as Monoid
 import qualified Data.Semigroup as Semigroup
 import Data.Ord (Down(..))
---import Data.Primitive.ByteArray
+#endif
 import Data.Primitive.Types (Prim(..), defaultSetOffAddr#, defaultSetByteArray#)
 import GHC.Real (Ratio(..))
 import Data.Word (Word64)
@@ -44,7 +48,7 @@ instance Prim a => Prim (Complex a) where
   indexByteArray# arr# i# =
     let x,y :: a
         x = indexByteArray# arr# (2# *# i#)
-        y = indexByteArray# arr# (2# *# i# +# 1#) 
+        y = indexByteArray# arr# (2# *# i# +# 1#)
     in x :+ y
   readByteArray# :: forall s a. (Prim a) => MutableByteArray# s -> Int# -> State# s -> (# State# s, Complex a #)
   readByteArray# arr# i# =
@@ -86,12 +90,12 @@ instance Prim a => Prim (Complex a) where
   {-# INLINE setOffAddr# #-}
 
 instance (Integral a, Prim a) => Prim (Ratio a) where
-  sizeOf# _ = 2# *# sizeOf# (undefined :: a) 
-  alignment# _ = alignment# (undefined :: a) 
+  sizeOf# _ = 2# *# sizeOf# (undefined :: a)
+  alignment# _ = alignment# (undefined :: a)
   indexByteArray# arr# i# =
     let x,y :: a
         x = indexByteArray# arr# (2# *# i#)
-        y = indexByteArray# arr# (2# *# i# +# 1#) 
+        y = indexByteArray# arr# (2# *# i# +# 1#)
     in x :% y
   readByteArray# :: forall s a. (Prim a) => MutableByteArray# s -> Int# -> State# s -> (# State# s, Ratio a #)
   readByteArray# arr# i# =
@@ -132,13 +136,13 @@ instance (Integral a, Prim a) => Prim (Ratio a) where
   {-# INLINE writeOffAddr# #-}
   {-# INLINE setOffAddr# #-}
 
-instance Prim Fingerprint where 
+instance Prim Fingerprint where
   sizeOf# _ = 2# *# sizeOf# (undefined :: Word64)
   alignment# _ = alignment# (undefined :: Word64)
   indexByteArray# arr# i# =
     let x,y :: Word64
         x = indexByteArray# arr# (2# *# i#)
-        y = indexByteArray# arr# (2# *# i# +# 1#) 
+        y = indexByteArray# arr# (2# *# i# +# 1#)
     in Fingerprint x y
   readByteArray# :: forall s. MutableByteArray# s -> Int# -> State# s -> (# State# s, Fingerprint #)
   readByteArray# arr# i# =
@@ -179,6 +183,8 @@ instance Prim Fingerprint where
   {-# INLINE writeOffAddr# #-}
   {-# INLINE setOffAddr# #-}
 
+#if !MIN_VERSION_primitive(0,7,0)
+
 deriving instance Prim a => Prim (Down a)
 #if MIN_VERSION_base(4,8,0)
 deriving instance Prim a => Prim (Identity a)
@@ -193,3 +199,5 @@ deriving instance Prim a => Prim (Semigroup.Min a)
 deriving instance Prim a => Prim (Semigroup.Max a)
 #endif
 deriving instance Prim a => Prim (Const a b)
+
+#endif
